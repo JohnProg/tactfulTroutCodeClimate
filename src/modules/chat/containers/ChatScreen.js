@@ -1,6 +1,7 @@
 import * as React from 'react'
 import get from 'lodash/get'
 import orderBy from 'lodash/orderBy'
+import isEqual from 'lodash/isEqual'
 import {
   Button,
   Text,
@@ -13,8 +14,8 @@ import {
   ActivityIndicator,
   PermissionsAndroid,
 } from 'react-native'
-import { withApollo, gql, graphql } from 'react-apollo'
-import { GiftedChat } from 'react-native-gifted-chat'
+import { graphql, compose } from 'react-apollo'
+import { GiftedChat, Send } from 'react-native-gifted-chat'
 import { ExpandingView } from 'react-native-jans-common-components'
 import KeyboardSpacer from 'react-native-keyboard-spacer'
 import PressMeButton from 'react-native-press-me-button'
@@ -25,85 +26,14 @@ const ImagePicker = require('react-native-image-picker')
 
 import Bubble from '../components/Bubble'
 import { PRIMARY_COLOR } from '../../../constants'
+import { sendTextMessage, sendAudioMessage, sendImageMessage } from '../actions'
+import { fetchMessages, subscriptionMessage } from '../actions'
 
 const audioPath = AudioUtils.DocumentDirectoryPath + '/voiceRecording.aac'
 const windowWidth = Dimensions.get('window').width
 const windowHeight = Dimensions.get('window').height
 
-const fetchMessages = gql`
-  query Me {
-    me {
-      _id
-      fullName
-      avatar
-      ... on Patient {
-        boundDetails {
-          chatRoom {
-            _id
-            messages(before: "2098-12-31T16:00:00.000Z") {
-              _id
-              __typename
-              sender {
-                _id
-                avatar
-                fullName
-              }
-              createdAt
-              ... on TextMessage {
-                text
-              }
-              ... on AudioMessage {
-                audioUrl
-              }
-              ... on ImageMessage {
-                imageUrl
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`
-
-const sendTextMessage = gql`
-  mutation SendTextChatMessage($chatRoomId: ID!, $text: String!) {
-    sendTextChatMessage(chatRoomId: $chatRoomId, text: $text) {
-      text
-    }
-  }
-`
-
-const sendAudioMessage = gql`
-  mutation SendAudioChatMessage(
-    $chatRoomId: ID!
-    $base64EncodedAudioData: String!
-  ) {
-    sendAudioChatMessage(
-      chatRoomId: $chatRoomId
-      base64EncodedAudioData: $base64EncodedAudioData
-    ) {
-      audioUrl
-    }
-  }
-`
-
-const sendImageMessage = gql`
-  mutation SendImageChatMessage(
-    $chatRoomId: ID!
-    $base64EncodedImageData: String!
-  ) {
-    sendImageChatMessage(
-      chatRoomId: $chatRoomId
-      base64EncodedImageData: $base64EncodedImageData
-    ) {
-      imageUrl
-    }
-  }
-`
-
-@withApollo
-export class ChatScreen extends React.Component {
+class ChatScreenCom extends React.Component {
   state = {
     me: {},
     chatRoomId: '',
@@ -111,7 +41,10 @@ export class ChatScreen extends React.Component {
     recording: false,
     hasPermission: undefined,
   }
+  componentWillMount() {
+    this.props.subscriptionMessage()
 
+  }
   async componentDidMount() {
     Sound.setCategory('Playback', true)
 
@@ -130,9 +63,9 @@ export class ChatScreen extends React.Component {
       }
     })
 
-    this.fetchMessages()
+    // this.fetchMessages()
 
-    this.intervalId = setInterval(this.fetchMessages, 5000)
+    // this.intervalId = setInterval(this.fetchMessages, 5000)
   }
 
   _checkPermission() {
@@ -164,54 +97,40 @@ export class ChatScreen extends React.Component {
     })
   }
 
-  fetchMessages = async () => {
-    try {
-      const result = await this.props.client.query({
-        query: fetchMessages,
-        fetchPolicy: 'network-only',
+  componentWillReceiveProps(np) {
+    const { fetchMessages } = this.props
+    if(!isEqual(fetchMessages, np.fetchMessages)
+      && !np.fetchMessages.loading && np.fetchMessages.me) {
+      const { me } = np.fetchMessages
+      const chatRoomId = get(me, 'boundDetails.chatRoom._id')
+
+      let messages = get(me, 'boundDetails.chatRoom.messages', [])
+
+      messages = messages.map(message => ({
+        _id: message._id,
+        text: message.text,
+        audioUrl: message.audioUrl,
+        image: message.imageUrl,
+        createdAt: message.createdAt,
+        user: {
+          _id: message.sender._id,
+          name: message.sender.fullName,
+          avatar: message.sender.avatar,
+        },
+      }))
+
+      messages = orderBy(messages, ['createdAt'], ['desc'])
+
+      this.setState({
+        messages,
+        chatRoomId,
+        me: {
+          _id: me._id,
+          name: me.fullName,
+          avatar: me.avatar,
+        },
       })
-
-      const { me, loading, error } = result.data
-      error && console.log(error)
-
-      if (!error && !loading && me) {
-        const chatRoomId = get(me, 'boundDetails.chatRoom._id')
-
-        let messages = get(me, 'boundDetails.chatRoom.messages', [])
-        // console.log(messages[0])
-
-        messages = messages.map(message => ({
-          _id: message._id,
-          text: message.text,
-          audioUrl: message.audioUrl,
-          image: message.imageUrl,
-          createdAt: message.createdAt,
-          user: {
-            _id: message.sender._id,
-            name: message.sender.fullName,
-            avatar: message.sender.avatar,
-          },
-        }))
-
-        messages = orderBy(messages, ['createdAt'], ['desc'])
-
-        this.setState({
-          messages,
-          chatRoomId,
-          me: {
-            _id: me._id,
-            name: me.fullName,
-            avatar: me.avatar,
-          },
-        })
-      }
-    } catch (e) {
-      console.log(e)
     }
-  }
-
-  componentWillUnmount() {
-    clearInterval(this.intervalId)
   }
 
   onSend = messages => {
@@ -220,13 +139,9 @@ export class ChatScreen extends React.Component {
       text: messages[0].text,
     }
 
-    this.props.client
-      .mutate({
-        mutation: sendTextMessage,
-        variables,
-      })
-      .then(this.fetchMessages)
-      .catch(console.error)
+    this.props.sendTextMessage({
+      variables,
+    })
   }
 
   onRecordPressIn = () => this.startRecording()
@@ -280,12 +195,12 @@ export class ChatScreen extends React.Component {
       base64EncodedAudioData: base64,
     }
 
-    this.props.client.mutate({ mutation: sendAudioMessage, variables })
+    this.props.sendAudioMessage({ variables })
   }
 
   onPicturePress = () => {
     const IMAGE_PICKER_OPTIONS = {
-      title: 'Send picture',
+      title: '发送图片',
       takePhotoButtonTitle: '拍照',
       chooseFromLibraryButtonTitle: '照片',
       cancelButtonTitle: '取消',
@@ -309,7 +224,7 @@ export class ChatScreen extends React.Component {
         chatRoomId: this.state.chatRoomId,
         base64EncodedImageData: response.data,
       }
-      this.props.client.mutate({ mutation: sendImageMessage, variables })
+      this.props.sendImageMessage({ variables })
     }
   }
 
@@ -373,6 +288,20 @@ export class ChatScreen extends React.Component {
       />
     )
   }
+  renderSend = props => {
+    return <Send {...props}>
+      <View style={{
+        marginRight: 10,
+        marginBottom: 4,
+        padding: 10,
+        backgroundColor: '#e9e9ef',
+        borderRadius: 5,
+      }}
+      >
+        <Text style={{fontSize: 16}}>发送</Text>
+      </View>
+    </Send>
+  }
 
   render() {
     return (
@@ -382,7 +311,11 @@ export class ChatScreen extends React.Component {
           onSend={this.onSend}
           user={this.state.me}
           renderChatFooter={this.renderChatFooter}
+          timeFormat="HH:mm"
+          placeholder="请输入..."
+          dateFormat="YYYY年MM月DD日"
           renderBubble={this.renderBubble}
+          renderSend={this.renderSend}
         />
         {/*Platform.OS === 'android' && <KeyboardSpacer />*/}
         {this.state.recording && (
@@ -407,10 +340,47 @@ export class ChatScreen extends React.Component {
               size="large"
               animating
             />
-            <Text style={{ fontSize: 22 }}>Recording...</Text>
+            <Text style={{ fontSize: 22 }}>录音中...</Text>
           </View>
         )}
       </ExpandingView>
     )
   }
 }
+
+export const ChatScreen = compose(
+  graphql(sendTextMessage, { name: 'sendTextMessage' }),
+  graphql(sendAudioMessage, { name: 'sendAudioMessage' }),
+  graphql(sendImageMessage, { name: 'sendImageMessage' }),
+  graphql(fetchMessages, {
+    name: 'fetchMessages',
+    props: props => ({
+      ...props,
+      subscriptionMessage: () =>
+        props.fetchMessages.subscribeToMore({
+          document: subscriptionMessage,
+          updateQuery: (pre, { subscriptionData }) => {
+            if(!subscriptionData.data) {
+              return pre
+            }
+            return {
+              ...pre,
+              me: {
+                ...pre.me,
+                boundDetails: {
+                  ...pre.me.boundDetails,
+                  chatRoom: {
+                    ...pre.me.boundDetails.chatRoom,
+                    messages: [
+                      subscriptionData.data.chatMessageAdded,
+                      ...pre.me.boundDetails.chatRoom.messages,
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        })
+      })
+  }),
+)(ChatScreenCom)

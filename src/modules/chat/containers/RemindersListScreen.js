@@ -34,7 +34,7 @@ const query = gql`
 @graphql(query)
 export class RemindersListScreen extends React.Component {
   static navigationOptions = ({ navigation }) => ({
-    title: '免费问医',
+    title: '问医生',
     header: null,
     tabBarIcon: ({ focused }) =>
       focused ? (
@@ -74,9 +74,17 @@ export class RemindersListScreen extends React.Component {
     } else if (this.state.canChat === false) {
       return (
         <ExpandingCenteringView>
-          <Text style={{ marginBottom: 20 }}>You can't chat, sorry.</Text>
+          <Text style={{
+              marginBottom: 20,
+              marginLeft: 30,
+              marginRight: 30,
+              fontSize: 20,
+              lineHeight: 30,
+          }}>
+            您未绑定医生服务，所以暂时不能发起聊天。但还可以继续测量血压，请联系您的门诊医生绑定服务。
+          </Text>
           <Button
-            title="Refresh"
+            title="尝试刷新"
             onPress={() => this.props.data.refetch().catch(() => null)}
           />
         </ExpandingCenteringView>
@@ -95,7 +103,7 @@ export class RemindersListScreen extends React.Component {
               textAlign: 'center',
             }}
           >
-            免费问医
+            问医生
           </Text>
         </View>
         <StatusBar hidden={false} />

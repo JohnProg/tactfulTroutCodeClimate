@@ -2,12 +2,13 @@ import * as React from 'react'
 import { View, Text, Platform } from 'react-native'
 import styled from 'styled-components/native'
 
-export const LCD = ({ systolic, diastolic, pulse }) =>
+export const LCD = ({ systolic, diastolic, pulse }) => (
   <View>
     <ResultItem name="systolic" value={systolic} />
     <ResultItem name="diastolic" value={diastolic} />
     <ResultItem name="pulse" value={pulse} />
   </View>
+)
 
 const itemsConfig = {
   systolic: { name: '高压', unit: 'mmHg' },
@@ -23,17 +24,11 @@ const ResultItem = ({ name, value }) => {
   return (
     <ItemWrapper>
       <ItemLabel>
-        <ItemName>
-          {itemConf.name}
-        </ItemName>
-        <ItemUnit>
-          {itemConf.unit}
-        </ItemUnit>
+        <ItemName>{itemConf.name}</ItemName>
+        <ItemUnit>{itemConf.unit}</ItemUnit>
       </ItemLabel>
       <View>
-        <ItemValue>
-          {value}
-        </ItemValue>
+        <ItemValue>{value}</ItemValue>
       </View>
     </ItemWrapper>
   )
@@ -52,7 +47,7 @@ const ItemUnit = styled.Text`
 
 const ItemValue = styled.Text`
   color: #fff;
-  font-size: 100;
+  font-size: 80;
   width: 160;
   font-family: ${Platform.OS === 'ios' ? 'DS-Digital' : 'ds_digit'};
   ${Platform.OS === 'ios' ? `font-weight: bold; font-style: italic;` : ''};

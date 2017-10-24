@@ -7,6 +7,7 @@ import {
   FlatList,
   View,
   StyleSheet,
+  NativeModules,
 } from 'react-native'
 import Icon from 'react-native-vector-icons/Entypo'
 import {
@@ -35,7 +36,7 @@ const userInfo = gql`
 export class ProfileScreen extends React.Component {
   state = {
     fullName: null,
-    avatar: null,
+    avatarUrl: null,
   }
 
   componentWillReceiveProps(nextProps) {
@@ -43,9 +44,11 @@ export class ProfileScreen extends React.Component {
 
     if (!error && !loading && me) {
       const { fullName, avatar } = me
+      //the avatar image url is randomly modified so the image is refreshed each time
+      avatar = avatar + '?' + Math.random()
       this.setState({
         fullName,
-        avatar,
+        avatarUrl: avatar,
       })
     }
   }
@@ -126,7 +129,7 @@ export class ProfileScreen extends React.Component {
               style={{ height: 64, width: 64, borderRadius: 32 }}
               source={{
                 uri:
-                  this.state.avatar ||
+                  this.state.avatarUrl ||
                   'https://png.icons8.com/question-mark-filled/ios7/80',
               }}
             />

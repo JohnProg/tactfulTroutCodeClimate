@@ -20,25 +20,9 @@ export class AboutUsScreen extends React.Component {
   render() {
     return (
       <ExpandingCenteringView>
-        <TouchableOpacity
-          onLongPress={async () => {
-            const currentEnv = await AsyncStorage.getItem(ASYNC_STORAGE_ENV_KEY)
-            if (currentEnv === 'STAGING') {
-              AsyncStorage.setItem(ASYNC_STORAGE_ENV_KEY, 'LOCAL')
-              Alert.alert('Env', 'Changed to LOCAL, please restart app')
-            } else if (currentEnv === 'LOCAL') {
-              AsyncStorage.setItem(ASYNC_STORAGE_ENV_KEY, 'PRODUCTION')
-              Alert.alert('Env', 'Changed to PRODUCTION, please restart app')
-            } else {
-              AsyncStorage.setItem(ASYNC_STORAGE_ENV_KEY, 'STAGING')
-              Alert.alert('Env', 'Changed to STAGING, please restart app')
-            }
-          }}
-        >
-          <IconImage
-            source={require('../../../assets/imgs/profile-company-icon.png')}
-          />
-        </TouchableOpacity>
+        <IconImage
+          source={require('../../../assets/imgs/profile-company-icon.png')}
+        />
         <AboutUsTextLarge>控血压</AboutUsTextLarge>
         <AboutUsTextLarge>客户端版本{VERSION}</AboutUsTextLarge>
         <AboutUsTextSmall>北京爱和健康科技有限公司版权所有</AboutUsTextSmall>

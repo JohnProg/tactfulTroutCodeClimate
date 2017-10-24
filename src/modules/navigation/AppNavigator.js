@@ -17,7 +17,7 @@ import { InitialScreen } from '../initial'
 import {
   UserManagementDispatchScreen,
   LogInOrSignUpScreen,
-  InfoCompletionScreen,
+  // InfoCompletionScreen,
   TermsOfServiceScreen,
 } from '../user-management'
 import { MeasuringScreen, MeasuringResultScreen } from '../measuring'
@@ -29,6 +29,10 @@ import {
   FeedbackScreen,
 } from '../profile'
 import { MeasurementHistoryScreen } from '../history'
+
+import { MeasureTrendScreen } from '../measuring/components'
+
+import { MeasurementTendencyScreen } from '../tendency'
 
 const TactfulTroutStackNavigator = constructStackNavigatorWithDefaultNavigationOptions(
   {
@@ -71,13 +75,15 @@ const MainStackNavigator = TactfulTroutStackNavigator({
   AboutUsScreen: { screen: AboutUsScreen },
   FeedbackScreen: { screen: FeedbackScreen },
   MeasurementHistoryScreen: { screen: MeasurementHistoryScreen },
+  MeasureTrendScreen: { screen: MeasureTrendScreen },
+  MeasurementTendencyScreen: { screen: MeasurementTendencyScreen },
 })
 
 const UserManagementStackNavigator = TactfulTroutStackNavigator(
   {
     UserManagementDispatchScreen: { screen: UserManagementDispatchScreen },
     LogInOrSignUpScreen: { screen: LogInOrSignUpScreen },
-    InfoCompletionScreen: { screen: InfoCompletionScreen },
+    // InfoCompletionScreen: { screen: InfoCompletionScreen },
     TermsOfServiceScreen: { screen: TermsOfServiceScreen },
   },
   { headerMode: 'none' },
@@ -99,5 +105,6 @@ export const AppNavigator = TabNavigator(
     },
 
     backBehavior: 'none',
+    lazy: true,
   },
 )

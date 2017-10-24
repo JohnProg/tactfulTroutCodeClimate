@@ -46,7 +46,7 @@ const WINDOW_WIDTH = Dimensions.get('window').width
 const IMAGE_WIDTH = WINDOW_WIDTH * 0.75
 const IMAGE_HEIGHT = IMAGE_WIDTH * 0.68
 
-const InstructionsImageContainer = styled(Animated.Image)`
+const InstructionsImageContainer = styled(Animated.Image) `
   width: ${IMAGE_WIDTH};
   height: ${IMAGE_HEIGHT};
   margin-bottom: 40;

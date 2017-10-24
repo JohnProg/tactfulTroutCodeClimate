@@ -13,3 +13,5 @@ export * from './ConnectedButtonContent'
 export * from './MeasuringFailedButtonContent'
 export * from './MeasureTime'
 export * from './BeforeMeasurePopupMenu'
+
+export * from './MeasureTrend'

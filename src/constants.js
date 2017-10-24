@@ -12,6 +12,9 @@ export const ASYNC_STORAGE_JWT_KEY = 'com.ihealth.tactful-trout.jwt'
 export const ASYNC_STORAGE_SAVED_MAC_KEY = 'com.ihealth.tactful-trout.savedMac'
 export const ASYNC_STORAGE_ENV_KEY = 'com.ihealth.tactful-trout.environment'
 
+export const API_APP_UPGRADE =
+  'https://app-upgrade.internal.ihealthcn.com/upgrade'
+
 export const BLOOD_PRESURE_STANDARD = [
   { id: 0, color: '#4caf50', text: '理想血压', description: '正常血压 <120 和  <80' },
   {

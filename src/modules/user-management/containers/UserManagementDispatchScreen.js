@@ -1,7 +1,6 @@
 import * as React from 'react'
 import * as wechat from 'react-native-wechat'
 import { gql, graphql, withApollo } from 'react-apollo'
-
 import {
   Text,
   View,
@@ -15,7 +14,11 @@ import {
 import { ExpandingView } from 'react-native-jans-common-components'
 import Icon from 'react-native-vector-icons/FontAwesome'
 
-import { PRIMARY_COLOR, ASYNC_STORAGE_JWT_KEY } from '../../../constants'
+import {
+  ASYNC_STORAGE_ENV_KEY,
+  PRIMARY_COLOR,
+  ASYNC_STORAGE_JWT_KEY,
+} from '../../../constants'
 
 const wechatLoginQuery = gql`
   query WechatRegisterorLoginForPatient(
@@ -29,6 +32,7 @@ const wechatLoginQuery = gql`
       jwt
       status
       wechatId
+      wechatGender
       wechatAvatar
     }
   }
@@ -75,11 +79,13 @@ export class UserManagementDispatchScreen extends React.Component {
         jwt,
         status,
         wechatId,
+        wechatGender,
         wechatAvatar,
       } = response.data.wechatRegisterorLoginForPatient
       if (!jwt) {
         this.props.navigation.navigate('LogInOrSignUpScreen', {
           wechatId,
+          wechatGender,
           wechatAvatar,
         })
       } else {
@@ -106,11 +112,29 @@ export class UserManagementDispatchScreen extends React.Component {
             alignItems: 'center',
           }}
         >
-          <Image
-            resizeMode="contain"
-            style={{ width: 100, height: 100 * 142 / 162 }}
-            source={require('../../../../assets/imgs/logo.png')}
-          />
+          <TouchableOpacity
+            onLongPress={async () => {
+              const currentEnv = await AsyncStorage.getItem(
+                ASYNC_STORAGE_ENV_KEY,
+              )
+              if (currentEnv === 'STAGING') {
+                AsyncStorage.setItem(ASYNC_STORAGE_ENV_KEY, 'LOCAL')
+                Alert.alert('Env', 'Changed to LOCAL, please restart app')
+              } else if (currentEnv === 'LOCAL') {
+                AsyncStorage.setItem(ASYNC_STORAGE_ENV_KEY, 'PRODUCTION')
+                Alert.alert('Env', 'Changed to PRODUCTION, please restart app')
+              } else {
+                AsyncStorage.setItem(ASYNC_STORAGE_ENV_KEY, 'STAGING')
+                Alert.alert('Env', 'Changed to STAGING, please restart app')
+              }
+            }}
+          >
+            <Image
+              resizeMode="contain"
+              style={{ width: 100, height: 100 * 142 / 162 }}
+              source={require('../../../../assets/imgs/logo.png')}
+            />
+          </TouchableOpacity>
           <Text
             style={{
               lineHeight: 30,

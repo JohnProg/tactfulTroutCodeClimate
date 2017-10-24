@@ -9,7 +9,7 @@ export const ChatButton = ({ onPress }) =>
       style={{ height: 20, width: 20 }}
       source={require('../../../../assets/imgs/tab-icon-doctor-3.png')}
     />
-    <Text style={{ fontSize: 16, color: '#fff', marginLeft: 10 }}>免费问医</Text>
+    <Text style={{ fontSize: 16, color: '#fff', marginLeft: 10 }}>问医生</Text>
   </StyledChatButton>
 
 const StyledChatButton = styled.TouchableOpacity`

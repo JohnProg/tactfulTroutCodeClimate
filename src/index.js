@@ -2,7 +2,6 @@
 import * as React from 'react'
 import * as wechat from 'react-native-wechat'
 import { StatusBar, AsyncStorage, AppState, View, Alert } from 'react-native'
-import { BP3LModule } from '@ihealth/ihealthlibrary-react-native'
 import { createStore, combineReducers } from 'redux'
 import { Provider } from 'react-redux'
 import { ExpandingView } from 'react-native-jans-common-components'
@@ -13,6 +12,10 @@ import {
   ApolloClient,
   IntrospectionFragmentMatcher,
 } from 'react-apollo'
+import {
+  SubscriptionClient,
+  addGraphQLSubscriptions,
+} from 'subscriptions-transport-ws'
 const Sound = require('react-native-sound')
 
 import './exceptionHandler'
@@ -27,23 +30,11 @@ import {
   WX_APP_ID,
 } from './constants'
 
-// AppState.addEventListener('change', async state => {
-//   if (state !== 'active') {
-//     console.log('Changing away from active state')
-//     const pairedBP3LMac = await AsyncStorage.getItem(ASYNC_STORAGE_SAVED_MAC_KEY)
-//     if (pairedBP3LMac) {
-//       console.log(
-//         `Disconnecting from ${pairedBP3LMac} before transitioning away from active state...`,
-//       )
-//       BP3LModule.disconnect(pairedBP3LMac)
-//     }
-//   }
+// @codePush({
+//   checkFrequency: codePush.CheckFrequency.ON_APP_RESUME,
+//   installMode: codePush.InstallMode.ON_NEXT_RESUME,
 // })
 
-@codePush({
-  checkFrequency: codePush.CheckFrequency.ON_APP_RESUME,
-  installMode: codePush.InstallMode.ON_NEXT_RESUME,
-})
 export class _Root extends React.Component {
   state = {
     apolloClient: null,
@@ -55,42 +46,52 @@ export class _Root extends React.Component {
     let networkInterface
 
     const env = await AsyncStorage.getItem(ASYNC_STORAGE_ENV_KEY)
-    if (env === 'PRODUCTION') {
+    let wsUri = ''
+    if (env === 'STAGING') {
       networkInterface = createNetworkInterface({
-        uri: 'https://dodgy-dove.301-prod.ihealthcn.com/graphql',
-      })
-    } else if (!env || env === 'STAGING') {
-      networkInterface = createNetworkInterface({
-        //uri: 'https://dodgy-dove.301-play.51ijk.com/graphql',
+        // uri: 'https://dodgy-dove.301-play.51ijk.com/graphql',
         uri: 'https://dodgy-dove-stg.ihealthlabs.com.cn/graphql',
       })
+      wsUri = 'wss://dodgy-dove-stg.ihealthlabs.com.cn/feedback'
     } else if (env === 'LOCAL') {
       networkInterface = createNetworkInterface({
         uri: 'http://localhost:3081/graphql',
       })
+      wsUri = 'ws://localhost:3081/feedback'
     } else {
-      Alert.alert('Unknown env', env)
+      networkInterface = createNetworkInterface({
+        uri: 'https://dodgy-dove.301-prod.ihealthcn.com/graphql',
+      })
+      wsUri = 'wss://dodgy-dove.301-prod.ihealthcn.com/feedback'
     }
-
     networkInterface.use([
       {
         async applyMiddleware(req, next) {
           if (!req.options.headers) {
             req.options.headers = {} // Create the header object if needed.
           }
-
+          const jwtInSide = await AsyncStorage.getItem(ASYNC_STORAGE_JWT_KEY)
+          // console.log('jwt: ', jwtInSide)
           req.options.headers['client-codename'] = 'TACTFUL_TROUT'
-
-          const jwt = await AsyncStorage.getItem(ASYNC_STORAGE_JWT_KEY)
-          if (jwt) {
-            req.options.headers.authorization = `Bearer: ${jwt}`
+          if (jwtInSide) {
+            req.options.headers.authorization = `Bearer: ${jwtInSide}`
           }
 
           next()
         },
       },
     ])
-
+    const jwt = await AsyncStorage.getItem(ASYNC_STORAGE_JWT_KEY)
+    const subscriptionClient = new SubscriptionClient(wsUri, {
+      reconnect: true,
+      connectionParams: {
+        token: jwt ? `Bearer: ${jwt}` : null,
+      },
+    })
+    const networkInterfaceWithPubSub = addGraphQLSubscriptions(
+      networkInterface,
+      subscriptionClient,
+    )
     const fragmentMatcher = new IntrospectionFragmentMatcher({
       introspectionQueryResultData: {
         __schema: {
@@ -111,7 +112,7 @@ export class _Root extends React.Component {
 
     this.setState({
       apolloClient: new ApolloClient({
-        networkInterface,
+        networkInterface: networkInterfaceWithPubSub,
         fragmentMatcher,
       }),
     })

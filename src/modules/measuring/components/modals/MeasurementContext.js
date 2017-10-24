@@ -81,15 +81,17 @@ const InstructionsSmall = styled.Text`
 
 const ShowResultButton = styled.TouchableOpacity`
   margin-top: 20;
+  margin-right: 20;
+  margin-left: 20;
   justify-content: center;
   align-items: center;
   align-self: stretch;
-  height: 60;
+  height: 50;
   border-radius: 2;
   background-color: ${PRIMARY_COLOR};
 `
 
 const ShowResultButtonText = styled.Text`
-  font-size: 20;
+  font-size: 18;
   color: white;
 `

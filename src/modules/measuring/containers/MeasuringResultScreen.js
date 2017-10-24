@@ -12,6 +12,7 @@ import {
   Text,
   Modal,
   ActivityIndicator,
+  AsyncStorage,
 } from 'react-native'
 import styled from 'styled-components/native'
 import {
@@ -19,8 +20,7 @@ import {
   ExpandingCenteringView,
 } from 'react-native-jans-common-components'
 import { gql, graphql } from 'react-apollo'
-
-import { PRIMARY_COLOR } from '../../../constants'
+import { ASYNC_STORAGE_SAVED_MAC_KEY, PRIMARY_COLOR } from '../../../constants'
 import {
   BambooRulers,
   LCD,
@@ -29,6 +29,8 @@ import {
 } from '../components'
 import { ChatButton } from '../../chat/components'
 import MEASUREMENT_STATES from '../measurementStates'
+
+import { MeasureTrend } from '../components/MeasureTrend'
 
 const APP_VERSION = require('../../../../package.json').version
 const MEASUREMENT_STATES_ENUM_TO_LABEL = invert(MEASUREMENT_STATES)
@@ -122,15 +124,16 @@ export class MeasuringResultScreen extends React.Component {
 
       // 服药前: 'BEFORE_TAKING_MEDICINE',
       // 服药后: 'AFTER_TAKING_MEDICINE',
-      const medicineContext = isTokenMedicine ?
-        'AFTER_TAKING_MEDICINE' : 'BEFORE_TAKING_MEDICINE'
-
+      const medicineContext = isTokenMedicine
+        ? 'AFTER_TAKING_MEDICINE'
+        : 'BEFORE_TAKING_MEDICINE'
+      const mac = await AsyncStorage.getItem(ASYNC_STORAGE_SAVED_MAC_KEY)
       const response = await this.props.mutate({
         variables: {
           systolic,
           diastolic,
           heartRate: pulse,
-          measurementDeviceAddress: 'TODO',
+          measurementDeviceAddress: mac,
           measurementDeviceModel: 'TODO',
           measuredAt: new Date(),
           measurementContext: [
@@ -163,7 +166,7 @@ export class MeasuringResultScreen extends React.Component {
           <LCD systolic={systolic} diastolic={diastolic} pulse={pulse} />
           <HistoryButton
             onPress={() =>
-              this.props.navigation.navigate('MeasurementHistoryScreen')}
+              this.props.navigation.navigate('MeasureTrendScreen')}
           >
             <HistoryText>查看测量历史</HistoryText>
           </HistoryButton>
@@ -188,11 +191,10 @@ export class MeasuringResultScreen extends React.Component {
           {this.state.canChat === null ? (
             <ActivityIndicator size="large" color={PRIMARY_COLOR} animating />
           ) : (
-            this.state.canChat === true && (
-              <ChatButton onPress={this.onChatButtonPress} />
-            )
-          )}
-          {/* TODO(jan): Don't show this button if patient is unbound */}
+              this.state.canChat === true && (
+                <ChatButton onPress={this.onChatButtonPress} />
+              )
+            )}
         </Bottom>
         <LegendModal
           visible={this.state.isExplanationModalVisible}

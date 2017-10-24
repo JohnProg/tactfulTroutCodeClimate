@@ -17,7 +17,7 @@ import {
   AppState,
 } from 'react-native'
 import { ExpandingView } from 'react-native-jans-common-components'
-import { BluetoothStatus } from 'react-native-bluetooth-status'
+import { BluetoothStatus } from 'react-native-bluetooth-status-new'
 import {
   iHealthDeviceManagerModule,
   BP3LModule,
@@ -26,7 +26,7 @@ import { DeviceEventEmitter } from 'react-native'
 import { Observable } from 'rxjs'
 import Icon from 'react-native-vector-icons/Entypo'
 import { gql, graphql } from 'react-apollo'
-import { get } from 'lodash'
+import { get, isEqual } from 'lodash'
 import nibbana from 'nibbana'
 
 import {
@@ -57,6 +57,9 @@ const userIdQuery = gql`
   query UserIdQuery {
     me {
       _id
+      ...on Patient {
+        measurementDeviceAddress
+      }
     }
   }
 `
@@ -73,21 +76,23 @@ export class MeasuringScreen extends React.Component {
           source={require('../../../../assets/imgs/tab-icon-home-2.png')}
         />
       ) : (
-        <Image
-          style={{ height: 32, width: 32 }}
-          source={require('../../../../assets/imgs/tab-icon-home-1.png')}
-        />
-      ),
+          <Image
+            style={{ height: 32, width: 32 }}
+            source={require('../../../../assets/imgs/tab-icon-home-1.png')}
+          />
+        ),
   }
 
   state = {
-    // state: 'INITIAL',
+    // state: 'DISCOVERING',
     state: 'PRE_INITIAL',
     errorCount: 0,
     discoveredMacs: [],
     batteryLevel: null,
+    popupDiscoverModal: false,
     isBeforeMeasureMenuShow: false,
     isTokenMedicine: false,
+    macAddress: '',
   }
 
   logState = () =>
@@ -99,8 +104,18 @@ export class MeasuringScreen extends React.Component {
   async componentDidMount() {
     this.logState()
     this.addListeners()
+    AppState.addEventListener('change', this.changeState)
   }
-
+  async componentWillReceiveProps(newProps) {
+    if (!isEqual(newProps.data, this.props.data) && !newProps.data.loading) {
+      const measurementDeviceAddress = get(newProps, 'data.me.measurementDeviceAddress') || ''
+      const localMeasurementDeviceAddress = await AsyncStorage.getItem(ASYNC_STORAGE_SAVED_MAC_KEY)
+      if(measurementDeviceAddress !== localMeasurementDeviceAddress) {
+        this.setState({macAddress: measurementDeviceAddress})
+        await AsyncStorage.setItem(ASYNC_STORAGE_SAVED_MAC_KEY, measurementDeviceAddress)
+      }
+    }
+  }
   componentWillUpdate(newProps, newState) {
     if (this.state.state !== newState.state) {
       console.log(
@@ -117,14 +132,42 @@ export class MeasuringScreen extends React.Component {
 
   componentWillUnmount() {
     this.removeListeners()
+    AppState.removeEventListener('change', this.changeState)
+  }
+
+  changeState = async state => {
+    const pairedBP3LMac = await AsyncStorage.getItem(ASYNC_STORAGE_SAVED_MAC_KEY)
+    if (pairedBP3LMac) {
+      if (state === 'background') {
+        BP3LModule.disconnect(pairedBP3LMac)
+      } else if (state === 'active') {
+        this.connect(pairedBP3LMac)
+      }
+    }else {
+      this.setState({
+        state: 'INITIAL'
+      })
+    }
   }
 
   startBP3LStateMachine = async () => {
+    navigator.geolocation.getCurrentPosition(
+      position => nibbana.registerSuperProperties({ position }),
+      () => {},
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
+    )
     const savedMac = await AsyncStorage.getItem(ASYNC_STORAGE_SAVED_MAC_KEY)
     if (savedMac) {
       this.connect(savedMac)
     } else {
       this.discover()
+      this.discoverTimeOut = setTimeout(async () => {
+        this.setState({
+          state: 'DISCOVERING_FAILED',
+          errorCount: this.state.errorCount + 1,
+        })
+        await AsyncStorage.setItem(ASYNC_STORAGE_SAVED_MAC_KEY, '')
+      }, 12*1000)
     }
   }
 
@@ -155,14 +198,14 @@ export class MeasuringScreen extends React.Component {
     this.notifyEventListener && this.notifyEventListener.remove()
   }
 
-  foundDeviceEventReceived = mac => {
-    switch (this.state.state) {
-      case 'DISCOVERING':
-        this.setState({ discoveredMacs: [...this.state.discoveredMacs, mac] })
-        break
-
-      default:
-        break
+  foundDeviceEventReceived = async mac => {
+    const { popupDiscoverModal, state,  discoveredMacs} = this.state
+    if (!popupDiscoverModal && state !== 'CONNECTING') {
+      iHealthDeviceManagerModule.stopDiscovery()
+      this.discoverTimeOut && clearTimeout(this.discoverTimeOut)
+      this.connect(mac)
+    } else {
+      this.setState({ discoveredMacs: [...this.state.discoveredMacs, mac] })
     }
   }
 
@@ -185,7 +228,7 @@ export class MeasuringScreen extends React.Component {
       case 'online_result_bp': {
         this.setState({ state: 'CONNECTED' })
 
-        nibbana.trackEvent('Successful measurement')
+        nibbana.logEvent('Successful measurement')
 
         const { sys: systolic, dia: diastolic, heartRate: pulse } = event
         const level = getLevelByStandard(systolic, diastolic)
@@ -201,6 +244,7 @@ export class MeasuringScreen extends React.Component {
   }
 
   connectedEventReceived = async mac => {
+    this.stopGuardProcess()
     switch (this.state.state) {
       case 'CONNECTING': {
         await AsyncStorage.setItem(ASYNC_STORAGE_SAVED_MAC_KEY, mac)
@@ -214,36 +258,70 @@ export class MeasuringScreen extends React.Component {
     }
   }
 
-  connectionFailedEventReceived = async mac =>
+  connectionFailedEventReceived = async mac => {
     this.setState({
       errorCount: this.state.errorCount + 1,
       state: 'CONNECTION_FAILED',
     })
+    await AsyncStorage.setItem(ASYNC_STORAGE_SAVED_MAC_KEY, '')
+    this.stopGuardProcess()
+  }
 
   connect = async mac => {
     this.setState({ batteryLevel: null })
-
     if (!mac) {
       throw new Error('mac is falsy')
     }
-    this.setState({ state: 'CONNECTING' }, async () => {
+    this.setState({ state: 'CONNECTING', macAddress: mac }, async () => {
       iHealthDeviceManagerModule.connectDevice(mac, 'BP3L')
-      await AsyncStorage.setItem(ASYNC_STORAGE_SAVED_MAC_KEY, mac)
-
-      BP3LModule.getBattery(mac)
+      this.startGuardProcess('CONNECTION_FAILED', 15)
     })
   }
 
-  discover = () =>
-    this.setState({ state: 'DISCOVERING', discoveredMacs: [] }, async () => {
+  startGuardProcess = (state, timeOut = 12) => {
+    console.log('~~~startGuardProcess')
+    this.setTimeoutValue = setTimeout(async () => {
+      this.setState({
+        state,
+        errorCount: this.state.errorCount + 1,
+      })
+      await AsyncStorage.setItem(ASYNC_STORAGE_SAVED_MAC_KEY, '')
+    }, timeOut*1000)
+  }
+
+  stopGuardProcess = () => {
+    console.log('!!!stopGuardProcess')
+    this.setTimeoutValue && clearTimeout(this.setTimeoutValue)
+  }
+
+  discover = async (popupDiscoverModal = false) => {
+    const isbluetoothOpened = await this.checkBluetooth()
+    if(!isbluetoothOpened) return
+    const { state } = this.state
+    const setObj = {
+      discoveredMacs: [],
+      popupDiscoverModal,
+    }
+    if (!/CONNECTED|MEASURING_FAILED/g.test(state)) {
+      setObj.state = 'DISCOVERING'
+    }
+    this.setState(setObj, async () => {
       iHealthDeviceManagerModule.stopDiscovery()
       iHealthDeviceManagerModule.startDiscovery(iHealthDeviceManagerModule.BP3L)
     })
+  }
 
-  cancelDiscover = async () =>
-    this.setState({ state: 'INITIAL' }, () => {
+  cancelDiscover = async () => {
+    const setObj = {
+      popupDiscoverModal: false,
+    }
+    if (!/CONNECTED|MEASURING_FAILED/g.test(this.state.state)) {
+      setObj.state = 'INITIAL'
+    }
+    this.setState(setObj, () => {
       iHealthDeviceManagerModule.stopDiscovery()
     })
+  }
 
   measure = async () => {
     const mac = await AsyncStorage.getItem(ASYNC_STORAGE_SAVED_MAC_KEY)
@@ -264,32 +342,31 @@ export class MeasuringScreen extends React.Component {
     }
   }
 
-  onBigButtonPress = async () => {
-    if (Platform.OS === 'ios') {
-      const isBluetoothEnabled = await BluetoothStatus.state()
-      if (!isBluetoothEnabled) {
+  checkBluetooth = async () => {
+    const isBluetoothEnabled = await BluetoothStatus.state()
+    if(!isBluetoothEnabled) {
+      if (Platform.OS === 'ios') {
         BluetoothStatus.openBluetoothSettings()
-        return
+      } else if(Platform.OS === 'android') {
+        await BluetoothStatus.enable()
       }
+      return false
     }
+    return true
+  }
+
+  onBigButtonPress = async () => {
+    const isbluetoothOpened = await this.checkBluetooth()
+    if(!isbluetoothOpened) return
     switch (this.state.state) {
       case 'PRE_INITIAL':
         this.setState({ isBeforeMeasureMenuShow: true })
         break
       case 'INITIAL':
-        // this.setState({ state: 'PRE_INITIAL' })
+      case 'DISCOVERING_FAILED':
+      case 'CONNECTION_FAILED':
         this.startBP3LStateMachine()
         break
-      case 'CONNECTION_FAILED': {
-        const mac = await AsyncStorage.getItem(ASYNC_STORAGE_SAVED_MAC_KEY)
-
-        if (mac) {
-          this.connect(mac)
-        } else {
-          this.setState({ state: 'INITIAL' })
-        }
-        break
-      }
       case 'CONNECTING':
         break
       case 'MEASURING_FAILED':
@@ -305,11 +382,9 @@ export class MeasuringScreen extends React.Component {
       case 'PRE_INITIAL':
         return (
           <BigButtonInLineBtn
-            onPress={
-              () => {
-                this.setState({ isBeforeMeasureMenuShow: true })
-              }
-            }
+            onPress={() => {
+              this.setState({ isBeforeMeasureMenuShow: true })
+            }}
           >
             <InlineBtnText>现在测量</InlineBtnText>
           </BigButtonInLineBtn>
@@ -319,7 +394,10 @@ export class MeasuringScreen extends React.Component {
       case 'DISCOVERING':
         return <BigButtonText>正在搜索</BigButtonText>
       case 'CONNECTING':
-        return <BigButtonText>正在连接血压计</BigButtonText>
+        return <View>
+          <BigButtonText>正在连接血压计</BigButtonText>
+          <BigButtonText>{this.state.macAddress.substr(-4)}</BigButtonText>
+        </View>
       case 'DISCOVERING_FAILED':
       case 'CONNECTION_FAILED':
         if (this.state.errorCount === 1) {
@@ -338,21 +416,21 @@ export class MeasuringScreen extends React.Component {
     }
   }
 
-    onMenuLeftPressed = async () => {
-      this.setState({
-        state: 'INITIAL',
-        isBeforeMeasureMenuShow: false,
-        isTokenMedicine: false,
-      })
-    }
+  onMenuLeftPressed = async () => {
+    this.setState({
+      state: 'INITIAL',
+      isBeforeMeasureMenuShow: false,
+      isTokenMedicine: false,
+    })
+  }
 
-    onMenuRightPressed = async () => {
-      this.setState({
-        state: 'INITIAL',
-        isBeforeMeasureMenuShow: false,
-        isTokenMedicine: true,
-      })
-    }
+  onMenuRightPressed = async () => {
+    this.setState({
+      state: 'INITIAL',
+      isBeforeMeasureMenuShow: false,
+      isTokenMedicine: true,
+    })
+  }
 
   render() {
     const topSectionFlex = 1.2
@@ -369,7 +447,7 @@ export class MeasuringScreen extends React.Component {
           flex={topSectionFlex}
           status={this.state.state}
           onHistoryPress={() => {
-            this.props.navigation.navigate('MeasurementHistoryScreen')
+            this.props.navigation.navigate('MeasureTrendScreen')
           }}
         />
         {this.state.state !== 'PRE_INITIAL' && (
@@ -387,7 +465,9 @@ export class MeasuringScreen extends React.Component {
           {this.renderBigButtonContent()}
         </BigButton>
         <DiscoveringModal
-          visible={this.state.state === 'DISCOVERING'}
+          visible={
+            this.state.popupDiscoverModal
+          }
           discoveredMacs={this.state.discoveredMacs}
           cancelDiscover={this.cancelDiscover}
           connect={mac => this.connect(mac)}
@@ -397,13 +477,12 @@ export class MeasuringScreen extends React.Component {
           heightOfTopSection={heightOfTopSection}
           cancelMeasurement={this.stopMeasurement}
         />
-        {
-        this.state.isBeforeMeasureMenuShow &&
-        <BeforeMeasurePopupMenu
-          onMenuLeftPressed={this.onMenuLeftPressed}
-          onMenuRightPressed={this.onMenuRightPressed}
-        />
-        }
+        {this.state.isBeforeMeasureMenuShow && (
+          <BeforeMeasurePopupMenu
+            onMenuLeftPressed={this.onMenuLeftPressed}
+            onMenuRightPressed={this.onMenuRightPressed}
+          />
+        )}
       </ExpandingView>
     )
   }

@@ -8,6 +8,7 @@ import {
   StatusBar,
   AsyncStorage,
   Alert,
+  ToastAndroid,
 } from 'react-native'
 import styled from 'styled-components/native'
 import { ExpandingView } from 'react-native-jans-common-components'
@@ -48,12 +49,19 @@ export class LogInOrSignUpScreen extends React.Component {
   state = {
     mobile: '',
     verificationCode: '',
+    verificationCodeText: '获取验证码',
     verificationCodeButtonDisabled: false,
   }
 
   onBackPress = () => this.props.navigation.goBack()
 
   onSendVerificationCodePress = () => {
+    const mobileText = this.state.mobile
+
+    if (!mobileText || mobileText.length !== 11) {
+      ToastAndroid.show('手机号输入有误 !', ToastAndroid.SHORT)
+      return
+    }
     this.props.client
       .mutate({
         mutation: sendVerificationCodeMutation,
@@ -61,28 +69,51 @@ export class LogInOrSignUpScreen extends React.Component {
       })
       .catch(() => null)
 
+    let countDownTime = 60
+
     this.setState({
       verificationCodeButtonDisabled: true,
     })
 
-    this.verificationCodeTimeout = setTimeout(
-      () => this.setState({ verificationCodeButtonDisabled: false }),
-      60 * 1000,
-    )
+    this.verificationCodeTextChange = setInterval(() => {
+      countDownTime--
+      if (countDownTime <= 0) {
+        this.setState({
+          verificationCodeText: '获取验证码',
+          verificationCodeButtonDisabled: false,
+        })
+        clearInterval(this.verificationCodeTextChange)
+      } else {
+        this.setState({ verificationCodeText: countDownTime + '秒' })
+      }
+    }, 1000)
   }
 
   onLogInPress = async () => {
     try {
       const wechatId = get(this.props.navigation, 'state.params.wechatId', null)
+      const wechatGender = get(
+        this.props.navigation,
+        'state.params.wechatGender',
+        null,
+      )
       const wechatAvatar = get(
         this.props.navigation,
         'state.params.wechatAvatar',
         null,
       )
-      console.log('WECHAT_ID_AND_AVATAR1:' + wechatId + wechatAvatar)
       const variables = {
         mobile: this.state.mobile,
         verificationCode: this.state.verificationCode,
+      }
+      if (
+        !variables.mobile ||
+        // variables.mobile.length !== 11 ||
+        !variables.verificationCode ||
+        variables.verificationCode.length < 4
+      ) {
+        ToastAndroid.show('输入有误 !', ToastAndroid.SHORT)
+        return
       }
       if (wechatId) {
         variables.wechatId = wechatId
@@ -93,20 +124,25 @@ export class LogInOrSignUpScreen extends React.Component {
       })
       const { jwt, didCreateNewPatient } = response.data.logInOrSignUpAsPatient
 
-      // console.log(didCreateNewPatient ? 'Signed up' : 'Logged in')
-
       await AsyncStorage.setItem(ASYNC_STORAGE_JWT_KEY, jwt)
       this.props.client.resetStore()
-      console.log(wechatId)
-      this.props.navigation.navigate('InfoCompletionScreen', {
-        wechatId,
-        wechatAvatar,
-      })
+      this.props.navigation.goBack()
+      this.props.navigation.navigate('MainStackNavigator')
+      // this.props.navigation.navigate('InfoCompletionScreen', {
+      //   wechatId,
+      //   wechatGender,
+      //   wechatAvatar,
+      // })
       this.setState({ verificationCodeButtonDisabled: false })
-      clearTimeout(this.verificationCodeTimeout)
+
+      clearInterval(this.verificationCodeTextChange)
     } catch (e) {
       Alert.alert('Error', e.message)
     }
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.verificationCodeTextChange)
   }
 
   render() {
@@ -190,7 +226,7 @@ export class LogInOrSignUpScreen extends React.Component {
                     fontSize: 17,
                   }}
                 >
-                  获取验证码
+                  {this.state.verificationCodeText}
                 </Text>
               </TouchableOpacity>
             </View>

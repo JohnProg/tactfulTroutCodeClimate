@@ -35,7 +35,9 @@ export class BottomHalf extends React.Component {
           {batteryLevel !== null && (
             <BatteryText>血压计剩余电量 {batteryLevel}%</BatteryText>
           )}
-          <DiscoverOtherDevicesButton onPress={discover}>
+          <DiscoverOtherDevicesButton
+            onPress={() => discover(true)}
+          >
             <DiscoverOtherDevicesText>连接其他血压计</DiscoverOtherDevicesText>
           </DiscoverOtherDevicesButton>
         </ContentWrapper>
@@ -81,15 +83,14 @@ const BatteryText = styled.Text`
 
 const DiscoverOtherDevicesButton = styled.TouchableOpacity`
   height: 20;
-  border-width: 1;
-  border-color: ${PRIMARY_COLOR};
-  border-radius: 10;
+  border-bottom-width: 1;
+  border-bottom-color: ${PRIMARY_COLOR};
   justify-content: center;
   align-items: center;
 `
 
 const DiscoverOtherDevicesText = styled.Text`
-  margin-horizontal: 10;
+  margin-horizontal: 2;
   font-size: 12;
   color: ${PRIMARY_COLOR};
 `

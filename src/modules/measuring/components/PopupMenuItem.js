@@ -1,24 +1,33 @@
 import * as React from 'react'
-import {
-  View,
-  Dimensions,
-  Text,
-  Image
-} from 'react-native'
+import { View, Dimensions, Text, Image } from 'react-native'
 import styled from 'styled-components/native'
 
-export const PopupMenuItem = ({text,imgUrl}) =>
-{
+export const PopupMenuItem = ({ text, imgName }) => {
+  // WTF require中的图片名字必须是一个静态字符串（不能使用变量！因为require是在编译时期执行，而非运行时期执行！）。
 
-  console.log(imgUrl);
-
-  return <Container>
-   <ItemContainer>
-     <MenuImage source={require('../../../../assets/imgs/iconWater.png')}/>
-     {/* <MenuImage source={require(imgUrl)}/> */}
-      <MenuText>{text}</MenuText>
-    </ItemContainer>
-    </Container>
+  if ('iconPills2x' === imgName) {
+    return (
+      <Container>
+        <ItemContainer>
+          <MenuImage
+            source={require('../../../../assets/imgs/iconPills2x.png')}
+          />
+          <MenuText>{text}</MenuText>
+        </ItemContainer>
+      </Container>
+    )
+  } else if ('iconWater2x' === imgName) {
+    return (
+      <Container>
+        <ItemContainer>
+          <MenuImage
+            source={require('../../../../assets/imgs/iconWater2x.png')}
+          />
+          <MenuText>{text}</MenuText>
+        </ItemContainer>
+      </Container>
+    )
+  }
 }
 
 const Container = styled.View`
@@ -38,10 +47,12 @@ const ItemContainer = styled.View`
 `
 
 const MenuImage = styled.Image`
-  height: 40;
-  width: 30;
-  background-color: white;
+  height: 41;
+  width: 32;
+  background-color: rgba(0, 0, 0, 0);
   align-self: center;
+  justify-content: center;
+  resize-mode: contain;
 `
 
 const MenuText = styled.Text`

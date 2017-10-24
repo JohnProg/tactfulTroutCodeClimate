@@ -54,23 +54,25 @@ export class MeasuringModal extends React.Component {
             </InstructionLabel>
             <InstructionLabel>均匀呼吸</InstructionLabel>
           </TextAboveContainer>
-          <Circle
-            heightOfTopSection={heightOfTopSection}
-            style={{
-              shadowOffset: { width: 0, height: 3 },
-            }}
-          >
-            <ImageContainer>
-              <PulseImage
-                resizeMode="cover"
-                style={{
-                  transform: [{ translateX: imageXOffset }],
-                }}
-                source={require('../../../../../assets/imgs/w3.png')}
-              />
-            </ImageContainer>
+          <CircleContainer>
+            <Circle
+              heightOfTopSection={heightOfTopSection}
+              style={{
+                shadowOffset: { width: 0, height: 3 },
+              }}
+            >
+              <ImageContainer>
+                <PulseImage
+                  resizeMode="cover"
+                  style={{
+                    transform: [{ translateX: imageXOffset }],
+                  }}
+                  source={require('../../../../../assets/imgs/w3.png')}
+                />
+              </ImageContainer>
+            </Circle>
             <CircularProgress />
-          </Circle>
+          </CircleContainer>
           <CancelButton
             onPress={cancelMeasurement}
             heightOfTopSection={heightOfTopSection}
@@ -101,19 +103,29 @@ const InstructionLabel = styled.Text`
   color: white;
   font-size: 22;
 `
-
+const BUTTON_SIZE_HACK = BUTTON_SIZE + 20
+const CircleContainer = styled.View`
+  width: ${BUTTON_SIZE_HACK};
+  height: ${BUTTON_SIZE_HACK};
+  align-items: center;
+  justify-content: center;
+`
 const Circle = styled.View`
+  margin-bottom: 10;
+  margin-left: 10;
+  margin-top: 10;
+  margin-right: 10;
   width: ${BUTTON_SIZE};
   height: ${BUTTON_SIZE};
   background-color: white;
   justify-content: center;
   align-items: center;
+  position: absolute;
   shadow-color: black;
   shadow-opacity: 0.8;
   shadow-radius: 6;
   elevation: 15;
   border-radius: ${BUTTON_SIZE};
-  padding: 5px;
 `
 
 const ImageContainer = styled.View`

@@ -47,8 +47,8 @@ const userInfo = gql`
   }
 `
 const updateAvatar = gql`
-  mutation($avatar: String!) {
-    updateAvatar(avatar: $avatar) {
+  mutation($avatarImageData: String!) {
+    updateAvatar(avatarImageData: $avatarImageData) {
       fullName
       mobile
       avatar
@@ -83,13 +83,16 @@ export class ProfileDetailsScreen extends React.Component {
 
     if (!error && !loading && me) {
       const { fullName, avatar, mobile, isBound } = me
+      //the avatar image url is randomly modified so the image is refreshed each time
+      avatar = avatar + '?' + Math.random()
+      console.log(avatar)
       this.setState({
         fullName,
-        avatar,
+        avatarUrl: avatar,
         mobile,
         isBound,
       })
-      if (me.boundDetails) {
+      if (isBound) {
         const { gender, dateOfBirth, height, weight } = me.boundDetails
         this.setState({
           gender,
@@ -105,17 +108,18 @@ export class ProfileDetailsScreen extends React.Component {
     title: '我的',
   })
 
-  onPictureChosen(avatar) {
-    this.props
-      .mutate({
-        variables: {
-          avatar,
-        },
-      })
-      .then(() => {
-        this.props.data.refetch().catch(e => null)
-        this.props.navigation.state.params.parentRefetch()
-      })
+  async onPictureChosen(avatarImageData) {
+    const response = await this.props.mutate({
+      variables: {
+        avatarImageData,
+      },
+    })
+    if (response && response.data && !response.data.error) {
+      const newAvatarUrl =
+        response.data.updateAvatar.avatar + '?' + Math.random()
+      console.log(response.data)
+      this.setState({ avatarUrl: newAvatarUrl })
+    }
   }
 
   pickImage = () => {
@@ -130,10 +134,6 @@ export class ProfileDetailsScreen extends React.Component {
         // You can also display the image using data:
         let source = 'data:image/jpeg;base64,' + response.data
         this.onPictureChosen(source)
-
-        this.setState({
-          avatar: source,
-        })
       }
     })
   }
@@ -179,16 +179,14 @@ export class ProfileDetailsScreen extends React.Component {
                     this.pickImage()
                   }}
                 >
-                  {this.state.avatar && (
-                    <Image
-                      style={{ height: 30, width: 30, borderRadius: 15 }}
-                      source={{
-                        uri:
-                          this.state.avatar ||
-                          'https://png.icons8.com/question-mark-filled/ios7/80',
-                      }}
-                    />
-                  )}
+                  <Image
+                    style={{ height: 30, width: 30, borderRadius: 15 }}
+                    source={{
+                      uri:
+                        this.state.avatarUrl ||
+                        'https://png.icons8.com/question-mark-filled/ios7/80',
+                    }}
+                  />
                 </RowWithRightArrow>
               )
             else
@@ -237,7 +235,7 @@ export class ProfileDetailsScreen extends React.Component {
                     style={{ height: 30, width: 30, borderRadius: 15 }}
                     source={{
                       uri:
-                        this.state.avatar ||
+                        this.state.avatarUrl ||
                         'https://png.icons8.com/question-mark-filled/ios7/80',
                     }}
                   />

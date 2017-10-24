@@ -38,8 +38,30 @@ const measureTimeQuery = gql`
   })
 })
 export class MeasureTime extends React.Component {
+  state = {
+    flagPeriod: 'isTomorrow'
+  }
+  componentDidMount() {
+    const six = moment({ hour: 6 })._d
+    const nine = moment({ hour: 9 })._d
+    const eighty = moment({ hour: 18 })._d
+    const twentyOne = moment({ hour: 21 })._d
+    const currentTime = moment()._d
+    let flagPeriod = 'isTomorrow'
+    if (currentTime > moment().startOf('day')._d && currentTime <= nine) {
+      flagPeriod = 'isMorning'
+    } else if (currentTime > nine && currentTime <= twentyOne) {
+      flagPeriod = 'isEvening'
+    } else if (currentTime > twentyOne) {
+      flagPeriod = 'isTomorrow'
+    }
+    this.setState({
+      flagPeriod,
+    })
+  }
+
   render() {
-    const status = get(this.props, 'data.me.currentMeasurePeriod', 'isMorning')
+    const status = get(this.props, 'data.me.currentMeasurePeriod', this.state.flagPeriod)
     return <Container>
       <InfoText isMarginTop>建议下次测量血压时间</InfoText>
       <InfoText fontSize={20}>{titleMaps[status].title}</InfoText>

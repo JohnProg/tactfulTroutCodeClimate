@@ -55,8 +55,9 @@ const CircleContainer = styled(Animated.View)`
   width: ${size};
   height: ${size};
   position: absolute;
-  top: -6;
-  left: -6;
+  left: 5;
+  top: 5;
+  elevation: 19;
 `
 
 const StyledCircleBall= styled(Animated.View)`

@@ -11,7 +11,7 @@ export function CheckBoxes({
   selectedIndices = [],
   isEnabled = true,
 }) {
-  const checkBoxes = labels.map((title, i) =>
+  const checkBoxes = labels.map((title, i) => (
     <View style={style} key={title}>
       <TouchableOpacity
         onPress={() => onButtonPress(i, title, !~selectedIndices.indexOf(i))}
@@ -32,8 +32,8 @@ export function CheckBoxes({
           {title}
         </Text>
       </TouchableOpacity>
-    </View>,
-  )
+    </View>
+  ))
 
   return (
     <View
@@ -50,9 +50,9 @@ export function CheckBoxes({
 const styles = {
   checkBoxesContainer: {
     flex: 0,
-    flexDirection: 'row',
+    flexDirection: 'column',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'center',
     opacity: 0.15,
   },
@@ -60,6 +60,9 @@ const styles = {
     opacity: 1,
   },
   checkBox: {
+    width: 280,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginVertical: 5,
     marginRight: 10,
     padding: 10,
@@ -74,7 +77,8 @@ const styles = {
     borderStyle: 'solid',
   },
   checkBoxText: {
-    fontSize: 20,
+    justifyContent: 'center',
+    fontSize: 14,
     color: 'rgba(0, 0, 0, 0.5)',
   },
   checkBoxTextSelected: {

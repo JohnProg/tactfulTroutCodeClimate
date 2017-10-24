@@ -27,13 +27,15 @@ const PADDING_HORIZONTAL = 50
 
 const updateAvatar = gql`
   mutation(
-    $avatar: String
+    $avatarUrl: String
+    $avatarImageData: String
     $fullName: String
     $dateOfBirth: Day
     $gender: Gender
   ) {
     updateAvatar(
-      avatar: $avatar
+      avatarUrl: $avatarUrl
+      avatarImageData: $avatarImageData
       fullName: $fullName
       dateOfBirth: $dateOfBirth
       gender: $gender
@@ -64,13 +66,14 @@ export class InfoCompletionScreen extends React.Component {
   state = {
     fullName: null,
     date: null,
-    gender: 'FEMALE',
-    avatar: null,
+    gender: null,
+    avatarUrl: null,
+    avatarImageData: null,
   }
   componentWillMount() {
-    wechatId = get(this.props.navigation, 'state.params.wechatId', null)
     wechatAvatar = get(this.props.navigation, 'state.params.wechatAvatar', null)
-    this.setState({ avatar: wechatAvatar })
+    wechatGender = get(this.props.navigation, 'state.params.wechatGender', null)
+    this.setState({ avatarUrl: wechatAvatar, gender: wechatGender || 'FEMALE' })
   }
 
   onBackPress = () => this.props.navigation.goBack()
@@ -85,7 +88,7 @@ export class InfoCompletionScreen extends React.Component {
         // You can also display the image using data:
         let source = 'data:image/jpeg;base64,' + response.data
         this.setState({
-          avatar: source,
+          avatarImageData: source,
         })
       }
     })
@@ -97,14 +100,19 @@ export class InfoCompletionScreen extends React.Component {
         fullName: this.state.fullName,
         dateOfBirth: this.state.date,
         gender: this.state.gender,
-        avatar: this.state.avatar,
       }
+      if (this.state.avatarImageData) {
+        variables.avatarImageData = this.state.avatarImageData
+      } else if (this.state.avatarUrl) {
+        variables.avatarUrl = this.state.avatarUrl
+      }
+
       const response = await this.props.client.mutate({
         mutation: updateAvatar,
         variables,
       })
 
-      this.props.client.resetStore()
+      //this.props.client.resetStore()
       this.props.navigation.navigate('MainStackNavigator')
     } catch (e) {
       Alert.alert('Error', e.message)
@@ -188,7 +196,8 @@ export class InfoCompletionScreen extends React.Component {
                 }}
                 source={{
                   uri:
-                    this.state.avatar ||
+                    this.state.avatarImageData ||
+                    this.state.avatarUrl ||
                     'https://png.icons8.com/question-mark-filled/ios7/80',
                 }}
               />
@@ -227,6 +236,7 @@ export class InfoCompletionScreen extends React.Component {
             <DatePicker
               style={{ width: 160 }}
               date={this.state.date}
+              androidMode="spinner"
               mode="date"
               format="YYYY-MM-DD"
               minDate="1900-01-01"
